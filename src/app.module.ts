@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CacheModule } from './common/cache/cache.module';
 import { configValidationSchema } from './config/config.schema';
+import { DeliveriesModule } from './deliveries/deliveries.module';
 import { DriversModule } from './drivers/drivers.module';
 import { HealthModule } from './health/health.module';
 import { ShiftsModule } from './shifts/shifts.module';
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     DriversModule,
     ShiftsModule,
+    DeliveriesModule,
     HealthModule,
   ],
   providers: [
