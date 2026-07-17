@@ -11,6 +11,8 @@ import type { TeamDto } from './dto/team.dto';
 import { DriversRepository, DriverWithTeam } from './drivers.repository';
 
 const TEAMS_CACHE_KEY = 'team:list';
+// 1-hour TTL: teams are seeded reference data that change only on an admin write
+// (out of scope). Mobile clients read this on every onboarding screen load.
 const TEAMS_TTL_SECONDS = 3600;
 
 const REQUIRED_ONBOARDING_FIELDS = [

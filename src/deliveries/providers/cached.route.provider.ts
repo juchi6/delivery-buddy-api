@@ -1,6 +1,8 @@
 import { CacheService } from '../../common/cache/cache.service';
 import type { LatLng, RouteProvider, RouteResult } from './route.provider';
 
+// 30-second TTL: the tracking screen polls route data every few seconds. 30 s
+// balances ETA freshness with avoiding repeated calls to the maps provider.
 const ROUTE_CACHE_TTL_SECONDS = 30;
 
 // Decorator that wraps any RouteProvider and caches results keyed by deliveryId.

@@ -92,6 +92,20 @@ describe('DriversService', () => {
       );
       expect(result).toEqual([{ id: TEAM.id, name: TEAM.name }]);
     });
+
+    it('falls through to the database when the cache returns null (Redis outage → CacheService returns null → same as a miss)', async () => {
+      // CacheService.get() already swallows Redis errors and returns null,
+      // so DriversService only ever sees null — it cannot tell a miss from an outage.
+      // This test documents that null from the cache always results in a DB read.
+      mockCache.get.mockResolvedValue(null);
+      mockRepo.findAllTeams.mockResolvedValue([TEAM]);
+      mockCache.set.mockResolvedValue(undefined);
+
+      const result = await service.getTeams();
+
+      expect(mockRepo.findAllTeams).toHaveBeenCalledTimes(1);
+      expect(result).toEqual([{ id: TEAM.id, name: TEAM.name }]);
+    });
   });
 
   // ── updateOnboarding ───────────────────────────────────────────────────────
