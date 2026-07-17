@@ -1,0 +1,296 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Transportation mode selected during driver onboarding (onboarding form screen).
+enum TransportationType {
+  BICYCLE
+  CAR
+  TRUCK
+}
+
+/// Availability state for a driver — controls dashboard idle vs active UI.
+enum DriverStatus {
+  OFFLINE
+  AVAILABLE
+  ON_SHIFT
+}
+
+/// Lifecycle state of a work shift.
+enum ShiftStatus {
+  ACTIVE
+  COMPLETED
+}
+
+/// Lifecycle state of a single delivery (order-detail + tracking screens).
+enum DeliveryStatus {
+  PENDING
+  IN_PROGRESS
+  AT_DOOR
+  DELIVERED
+  CANCELLED
+}
+
+/// Financial transaction category (wallet / earnings screen).
+enum TransactionType {
+  EARNING
+  TIP
+  WITHDRAWAL
+}
+
+/// Who sent a chat message (chat screen; supports driver↔support and driver↔customer threads).
+enum MessageSenderType {
+  DRIVER
+  CUSTOMER
+  SUPPORT
+}
+
+/// Payout method category stored against a driver (settings → billing method screen).
+enum BillingMethodType {
+  BANK_TRANSFER
+  PAYPAL
+  CRYPTO
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A courier/gig driver. Central entity — every other table relates back here.
+/// Derived from: onboarding form, profile/settings screen, dashboard screen.
+model Driver {
+  id                 String             @id @default(cuid())
+  /// Employer-assigned work ID shown on the onboarding form.
+  workId             String             @unique
+  firstName          String
+  lastName           String
+  email              String             @unique
+  passwordHash       String
+  /// Optional until onboarding is complete.
+  teamId             String?
+  transportationType TransportationType?
+  /// Plate / bike registration number (optional until onboarding complete).
+  vehicleNumber      String?
+  /// Gamification level shown on profile screen.
+  level              Int                @default(1)
+  /// Per-delivery commission percentage shown on profile screen.
+  commissionRate     Float              @default(0.0)
+  avatarUrl          String?
+  status             DriverStatus       @default(OFFLINE)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Relations
+  team               Team?              @relation(fields: [teamId], references: [id])
+  shifts             Shift[]
+  deliveries         Delivery[]
+  transactions       Transaction[]
+  notifications      Notification[]
+  billingMethod      BillingMethod?
+
+  @@index([teamId])
+  @@index([status])
+}
+
+/// Lookup table for selectable teams shown in the onboarding dropdown.
+/// Flag for business input — seed with placeholder values for the assessment.
+model Team {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  // Relations
+  drivers   Driver[]
+}
+
+/// A single work shift — starts when driver taps "Start Shift", ends on "Stop Shift".
+/// Aggregates earnings, tips, and deliveries for the dashboard "My last shift" card.
+model Shift {
+  id                  String      @id @default(cuid())
+  driverId            String
+  startedAt           DateTime    @default(now())
+  endedAt             DateTime?
+  status              ShiftStatus @default(ACTIVE)
+  /// Running/final total earnings for this shift (in the app's currency unit).
+  earnings            Float       @default(0.0)
+  /// Running/final tips accumulated during this shift.
+  tips                Float       @default(0.0)
+  /// Count of deliveries marked DELIVERED within this shift.
+  deliveriesCompleted Int         @default(0)
+
+  // Relations
+  driver              Driver      @relation(fields: [driverId], references: [id])
+  deliveries          Delivery[]
+
+  /// Fast lookup: "does this driver have an active shift?"
+  @@index([driverId, status])
+  /// Fast lookup: shift history ordered by start time.
+  @@index([driverId, startedAt])
+}
+
+/// A single delivery order. Core entity for the order-detail and tracking screens.
+/// A delivery belongs to a driver and optionally to a shift (assigned when the
+/// shift starts — nullable to allow pre-created delivery records).
+model Delivery {
+  id                      String         @id @default(cuid())
+  /// Human-readable order reference shown on the order-detail screen.
+  orderNumber             String         @unique
+  status                  DeliveryStatus @default(PENDING)
+  driverId                String
+  /// Nullable: set when a shift is active and the delivery is assigned to it.
+  shiftId                 String?
+
+  // Pickup details (shown on tracking screen)
+  pickupName              String
+  pickupAddress           String
+
+  // Destination details (shown on order-detail and tracking screens)
+  destinationCustomerName String
+  destinationAddress      String
+  destinationPhone        String
+
+  // Financials (shown on order-detail screen)
+  /// Total order value (sum of all OrderItem lineTotals).
+  totalAmount             Float
+  /// Driver's cut for this delivery (after commission).
+  driverEarning           Float          @default(0.0)
+  tipAmount               Float          @default(0.0)
+  /// Stored as a label string (e.g. "Cash", "Card") — not a FK to BillingMethod,
+  /// because this is the customer's payment method, not the driver's payout method.
+  paymentMethod           String
+
+  // Tracking (shown on live tracking/map screen — populated by RouteProvider)
+  /// Estimated time of arrival in minutes; updated periodically.
+  eta                     Int?
+  distanceRemainingKm     Float?
+
+  createdAt               DateTime       @default(now())
+  deliveredAt             DateTime?
+
+  // Relations
+  driver                  Driver         @relation(fields: [driverId], references: [id])
+  shift                   Shift?         @relation(fields: [shiftId], references: [id])
+  orderItems              OrderItem[]
+  messages                Message[]
+  transactions            Transaction[]
+
+  /// Fast lookup: current/next delivery for a driver.
+  @@index([driverId, status])
+  /// Fast lookup: all deliveries in a shift.
+  @@index([shiftId])
+  @@index([createdAt])
+}
+
+/// Line items within a delivery order (order-detail screen item list).
+/// Example: "Ham and Cheese Pizza 11 inch  $12 + $2 extra"
+model OrderItem {
+  id                   String   @id @default(cuid())
+  deliveryId           String
+  name                 String
+  basePrice            Float
+  /// Free-text description of modifiers (e.g. "11 inch, extra cheese").
+  modifiersDescription String?
+  /// Additional charge for modifiers.
+  extraPrice           Float    @default(0.0)
+  quantity             Int      @default(1)
+  /// Pre-computed: (basePrice + extraPrice) * quantity
+  lineTotal            Float
+
+  // Relations
+  delivery             Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
+}
+
+/// Ledger entry for a driver's earnings/tips/withdrawals (wallet/earnings screen).
+/// deliveryId is nullable — withdrawals are not tied to a specific delivery.
+model Transaction {
+  id         String          @id @default(cuid())
+  driverId   String
+  /// Null for withdrawals; set for EARNING and TIP transactions.
+  deliveryId String?
+  type       TransactionType
+  amount     Float
+  occurredAt DateTime        @default(now())
+
+  // Relations
+  driver     Driver          @relation(fields: [driverId], references: [id])
+  delivery   Delivery?       @relation(fields: [deliveryId], references: [id])
+
+  /// Paginated wallet history, ordered by date.
+  @@index([driverId, occurredAt])
+  @@index([deliveryId])
+}
+
+/// In-app chat message tied to a specific delivery (chat screen).
+/// senderType supports driver↔support and driver↔customer threads via the same schema.
+/// senderId is a plain String (not a Driver FK) because CUSTOMER and SUPPORT senders
+/// may not exist in the Driver table.
+model Message {
+  id          String            @id @default(cuid())
+  deliveryId  String
+  /// Opaque ID of the sender (driverId, customerId, or support agent ID).
+  senderId    String
+  senderType  MessageSenderType
+  body        String
+  attachmentUrl String?
+  sentAt      DateTime          @default(now())
+  /// Null until the recipient has read the message.
+  seenAt      DateTime?
+
+  // Relations
+  delivery    Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  /// Message thread in chronological order (primary query pattern for the chat screen).
+  @@index([deliveryId, sentAt])
+}
+
+/// Push / in-app notification for a driver (settings → notifications screen).
+model Notification {
+  id        String   @id @default(cuid())
+  driverId  String
+  /// Free-form type tag (e.g. "new_delivery", "shift_summary", "withdrawal_complete").
+  type      String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  driver    Driver   @relation(fields: [driverId], references: [id])
+
+  /// Unread notifications list (primary query pattern).
+  @@index([driverId, isRead])
+  @@index([driverId, createdAt])
+}
+
+/// Driver's saved payout method (settings → billing method screen).
+/// 1:1 with Driver — one row per driver, enforced by @@unique([driverId]).
+/// `details` stores tokenized/opaque data (never raw account numbers).
+model BillingMethod {
+  id        String            @id @default(cuid())
+  driverId  String
+  type      BillingMethodType
+  /// Tokenized payout details (e.g. last-4 of bank account, PayPal email masked).
+  /// In production this would be a reference token from the payment provider.
+  details   Json
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  // Relations
+  driver    Driver            @relation(fields: [driverId], references: [id])
+
+  /// Enforces the 1:1 relationship described in the domain model.
+  @@unique([driverId])
+}
