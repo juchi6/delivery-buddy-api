@@ -7,6 +7,7 @@ import { ChatModule } from './chat/chat.module';
 import { CacheModule } from './common/cache/cache.module';
 import { configValidationSchema } from './config/config.schema';
 import { DeliveriesModule } from './deliveries/deliveries.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { WalletModule } from './wallet/wallet.module';
 import { DriversModule } from './drivers/drivers.module';
 import { HealthModule } from './health/health.module';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     DeliveriesModule,
     ChatModule,
     WalletModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [
