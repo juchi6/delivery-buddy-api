@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { ChatModule } from './chat/chat.module';
 import { CacheModule } from './common/cache/cache.module';
 import { configValidationSchema } from './config/config.schema';
 import { DeliveriesModule } from './deliveries/deliveries.module';
@@ -25,6 +26,7 @@ import { PrismaModule } from './prisma/prisma.module';
     DriversModule,
     ShiftsModule,
     DeliveriesModule,
+    ChatModule,
     WalletModule,
     HealthModule,
   ],
