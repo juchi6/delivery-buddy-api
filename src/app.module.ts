@@ -7,6 +7,7 @@ import { CacheModule } from './common/cache/cache.module';
 import { configValidationSchema } from './config/config.schema';
 import { DriversModule } from './drivers/drivers.module';
 import { HealthModule } from './health/health.module';
+import { ShiftsModule } from './shifts/shifts.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { PrismaModule } from './prisma/prisma.module';
     CacheModule,
     AuthModule,
     DriversModule,
+    ShiftsModule,
     HealthModule,
   ],
   providers: [
