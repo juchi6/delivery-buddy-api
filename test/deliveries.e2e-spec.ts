@@ -139,12 +139,10 @@ describe('Deliveries (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (createdDeliveryIds.length) {
-      // OrderItems cascade from Delivery; Messages would too. Transactions do not cascade,
-      // but none are created in this test suite so direct delivery delete is safe.
-      await prisma.delivery.deleteMany({ where: { id: { in: createdDeliveryIds } } });
-    }
     if (createdDriverIds.length) {
+      // Delete deliveries by driverId rather than tracked IDs — safer if beforeAll
+      // timed out mid-seeding and createdDeliveryIds is only partially filled.
+      await prisma.delivery.deleteMany({ where: { driverId: { in: createdDriverIds } } });
       await prisma.shift.deleteMany({ where: { driverId: { in: createdDriverIds } } });
       await prisma.transaction.deleteMany({ where: { driverId: { in: createdDriverIds } } });
       await prisma.notification.deleteMany({ where: { driverId: { in: createdDriverIds } } });
