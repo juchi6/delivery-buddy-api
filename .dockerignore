@@ -1,0 +1,30 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build output (rebuilt inside Docker) ──────────────────────────────────────
+dist/
+coverage/
+
+# ── Secrets — NEVER bake into the image ───────────────────────────────────────
+.env
+.env.*
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Test files ────────────────────────────────────────────────────────────────
+test/
+**/*.spec.ts
+**/*.e2e-spec.ts
+
+# ── Editor / OS artefacts ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── CI / docs (not needed at runtime) ────────────────────────────────────────
+.github/
+docs/
+*.md
