@@ -54,7 +54,7 @@ A production-ready REST API backend for a last-mile delivery driver application.
 
 ### In-App Chat
 - `GET  /api/v1/deliveries/:id/messages` — chronological message thread for a delivery
-- `POST /api/v1/deliveries/:id/messages` — send a message; `senderType` is always forced to `DRIVER` from the JWT
+- `POST /api/v1/deliveries/:id/messages` — send a message (`senderType` is always `DRIVER`, set from the JWT)
 
 ### Wallet & Earnings
 - `GET  /api/v1/wallet/me` — current balance
@@ -119,11 +119,14 @@ This spins up:
 - **PostgreSQL 16** on `localhost:5433`
 - **Redis 7** on `localhost:6379`
 
-### 4. Run database migrations
+### 4. Run migrations and seed
 
 ```bash
 npx prisma migrate deploy
+npx prisma db seed
 ```
+
+The seed populates the `teams` table (Alpha, Beta, Gamma, Delta Team) which the onboarding flow requires.
 
 ### 5. Start the API
 
@@ -139,7 +142,7 @@ The server starts on `http://localhost:3000`.
 
 ### 6. Explore the API
 
-Swagger UI is available at:
+Swagger UI — full interactive docs:
 
 ```
 http://localhost:3000/api/docs
@@ -151,11 +154,27 @@ Health check:
 http://localhost:3000/health
 ```
 
+**To authenticate in Swagger:**
+1. `POST /api/v1/auth/signup` with the body below to create a driver account
+2. `POST /api/v1/auth/login` with the same credentials — copy the `accessToken` from the response
+3. Click **Authorize** at the top of the Swagger page, paste `Bearer <accessToken>`, confirm
+
+Example signup body:
+```json
+{
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "email": "jane@example.com",
+  "password": "password123",
+  "workId": "WK-001"
+}
+```
+
 ---
 
 ## Running with Docker
 
-Build and run the production image against the local docker-compose services:
+Stop the local dev server first if it's running on port 3000, then build and run the production image against the docker-compose services:
 
 ```bash
 docker build -t delivery-buddy-api .
@@ -167,17 +186,19 @@ docker run --env-file .env \
   delivery-buddy-api
 ```
 
-> `host.docker.internal` resolves to the host machine from inside the container (Docker Desktop for Mac/Windows). On Linux, use `--network host` and `localhost` instead.
+> `host.docker.internal` resolves to the host machine from inside the container (Docker Desktop on Mac/Windows). On Linux use `--network host` and `localhost` instead.
 
 ---
 
 ## Running Tests
 
+Ensure docker-compose services are running before running e2e tests.
+
 ```bash
 # Unit tests
 npm test
 
-# E2e tests (requires docker-compose services running)
+# E2e tests
 npm run test:e2e
 
 # Coverage report
