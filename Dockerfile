@@ -37,7 +37,9 @@ COPY prisma.config.ts ./
 RUN npm ci
 
 # Generate the Prisma client so the TypeScript import resolves at build time.
-RUN npx prisma generate
+# prisma.config.ts validates DATABASE_URL is present even though `generate` never
+# connects to the database. A placeholder satisfies the env() check at build time.
+RUN DATABASE_URL=postgresql://placeholder:placeholder@localhost/placeholder npx prisma generate
 
 # Copy remaining source files and compile.
 COPY tsconfig*.json nest-cli.json ./
@@ -80,4 +82,4 @@ ENTRYPOINT ["dumb-init", "--"]
 # Startup sequence:
 #   1. Apply any pending migrations (`migrate deploy` is a no-op when up to date).
 #   2. Boot the compiled NestJS app.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
