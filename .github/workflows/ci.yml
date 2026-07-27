@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Unit + E2E tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: delivery_buddy
+          POSTGRES_PASSWORD: delivery_buddy_secret
+          POSTGRES_DB: delivery_buddy_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PORT: 3000
+      DATABASE_URL: postgresql://delivery_buddy:delivery_buddy_secret@localhost:5432/delivery_buddy_db?schema=public
+      REDIS_URL: redis://localhost:6379
+      # JWT_SECRET is a GitHub Actions secret — set it in repo Settings → Secrets.
+      # A fallback value is provided so forks without the secret can still run CI.
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-test-secret-do-not-use-in-production' }}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Run unit tests
+        run: npm test -- --no-coverage
+
+      - name: Run e2e tests
+        run: npm run test:e2e -- --no-coverage
